@@ -60,7 +60,7 @@ public:
 
     //==============================================================================
     //[UserMethods]     -- You can add your own custom methods in this section.
-    
+
 
     //[/UserMethods]
 
