@@ -25,7 +25,7 @@
 
 
 //[MiscUserDefs] You can add your own user definitions and misc code here...
-const int sensorEdit_width = 176;
+const int sensorEdit_width = 212;
 const int sensorEdit_height = 32;
 //[/MiscUserDefs]
 
@@ -57,29 +57,48 @@ inputCoordsView::inputCoordsView (PluginProcessor* ownerFilter, int _maxNCH, int
     hAmbi = hVst->getFXHandle();
     maxNCH = _maxNCH ;
     currentNCH =_currentNCH;
-    aziSliders =  new std::unique_ptr<Slider>[(unsigned long)maxNCH];
-    elevSliders =  new std::unique_ptr<Slider>[(unsigned long)maxNCH];
+    xSliders =  new std::unique_ptr<Slider>[maxNCH];
+    ySliders =  new std::unique_ptr<Slider>[maxNCH];
+    zSliders =  new std::unique_ptr<Slider>[maxNCH];
 
     for( int i=0; i<maxNCH; i++){
-        /* create and initialise azimuth sliders */
-        aziSliders[i].reset (new Slider ("new slider"));
-        addAndMakeVisible (aziSliders[i].get());
-        aziSliders[i]->setRange (-360.0, 360.0, 0.001);
-        aziSliders[i]->setValue(ambi_roomsim_getSourceAzi_deg(hAmbi, i));
-        aziSliders[i]->setSliderStyle (Slider::LinearHorizontal);
-        aziSliders[i]->setTextBoxStyle (Slider::TextBoxRight, false, 70, 20);
-        aziSliders[i]->setBounds(-25, 8 + i*sensorEdit_height, 96, 16);
-        aziSliders[i]->addListener (this);
+        /* create x sliders */
+        xSliders[i].reset (new Slider ("new slider"));
+        addAndMakeVisible (xSliders[i].get());
+        xSliders[i]->setTextBoxStyle (Slider::TextBoxRight, false, 58, 20);
+        xSliders[i]->setBounds(24, 8 + i*sensorEdit_height, 58, 16);
+        xSliders[i]->addListener (this);
+        xSliders[i]->setColour(Slider::trackColourId, Colours::transparentBlack);
+        xSliders[i]->setSliderStyle(Slider::SliderStyle::LinearBarVertical);
+        xSliders[i]->setSliderSnapsToMousePosition(false);
 
-        /* create and initialise elevation sliders */
-        elevSliders[i].reset (new Slider ("new slider"));
-        addAndMakeVisible (elevSliders[i].get());
-        elevSliders[i]->setRange (-180.0, 180.0, 0.001);
-        elevSliders[i]->setValue(ambi_roomsim_getSourceElev_deg(hAmbi, i));
-        elevSliders[i]->setSliderStyle (Slider::LinearHorizontal);
-        elevSliders[i]->setTextBoxStyle (Slider::TextBoxLeft, false, 70, 20);
-        elevSliders[i]->setBounds(105, 8 + i*sensorEdit_height, 96, 16);
-        elevSliders[i]->addListener (this);
+        /* create y sliders */
+        ySliders[i].reset (new Slider ("new slider"));
+        addAndMakeVisible (ySliders[i].get());
+        ySliders[i]->setTextBoxStyle (Slider::TextBoxRight, false, 58, 20);
+        ySliders[i]->setBounds(86, 8 + i*sensorEdit_height, 58, 16);
+        ySliders[i]->addListener (this);
+        ySliders[i]->setColour(Slider::trackColourId, Colours::transparentBlack);
+        ySliders[i]->setSliderStyle(Slider::SliderStyle::LinearBarVertical);
+        ySliders[i]->setSliderSnapsToMousePosition(false);
+
+        /* create z sliders */
+        zSliders[i].reset (new Slider ("new slider"));
+        addAndMakeVisible (zSliders[i].get());
+        zSliders[i]->setTextBoxStyle (Slider::TextBoxRight, false, 58, 20);
+        zSliders[i]->setBounds(148, 8 + i*sensorEdit_height, 58, 16);
+        zSliders[i]->addListener (this);
+        zSliders[i]->setColour(Slider::trackColourId, Colours::transparentBlack);
+        zSliders[i]->setSliderStyle(Slider::SliderStyle::LinearBarVertical);
+        zSliders[i]->setSliderSnapsToMousePosition(false);
+
+        /* Initialise sliders */
+        xSliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimX(hAmbi), 0.001);
+        xSliders[i]->setValue(ambi_roomsim_getSourceX(hAmbi, i), dontSendNotification);
+        ySliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimY(hAmbi), 0.001);
+        ySliders[i]->setValue(ambi_roomsim_getSourceY(hAmbi, i), dontSendNotification);
+        zSliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimZ(hAmbi), 0.001);
+        zSliders[i]->setValue(ambi_roomsim_getSourceZ(hAmbi, i), dontSendNotification);
     }
 
     sliderHasChanged = true;
@@ -99,11 +118,13 @@ inputCoordsView::~inputCoordsView()
 
     //[Destructor]. You can add your own custom destruction code here..
     for( int i=0; i<maxNCH; i++){
-        aziSliders[i] = nullptr;
-        elevSliders[i] = nullptr;
+        xSliders[i] = nullptr;
+        ySliders[i] = nullptr;
+        zSliders[i] = nullptr;
     }
-    delete [] aziSliders;
-    delete [] elevSliders;
+    delete [] xSliders;
+    delete [] ySliders;
+    delete [] zSliders;
     //[/Destructor]
 }
 
@@ -151,7 +172,7 @@ void inputCoordsView::paint (juce::Graphics& g)
     for( int i=0; i<maxNCH; i++){
         /* draw sensor IDs */
         g.setColour (fillColour);
-        g.drawText (String(i+1), 72, 5+ i*sensorEdit_height, 33, 23,
+        g.drawText (String(i+1), -4, 5+ i*sensorEdit_height, 33, 23,
                     Justification::centred, true);
 
         /* draw rectangle around sensor parameter */
@@ -181,14 +202,18 @@ void inputCoordsView::sliderValueChanged (juce::Slider* sliderThatWasMoved)
 {
     //[UsersliderValueChanged_Pre]
     for(int i=0; i<maxNCH; i++){
-//        if (sliderThatWasMoved == aziSliders[i].get()) {
-//            ambi_roomsim_setSourceAzi_deg(hAmbi, i, (float)aziSliders[i]->getValue());
-//            break;
-//        }
-//        if (sliderThatWasMoved == elevSliders[i].get()) {
-//            ambi_roomsim_setSourceElev_deg(hAmbi, i, (float)elevSliders[i]->getValue());
-//            break;
-//        }
+        if (sliderThatWasMoved == xSliders[i].get()) {
+            ambi_roomsim_setSourceX(hAmbi, i, (float)xSliders[i]->getValue());
+            break;
+        }
+        if (sliderThatWasMoved == ySliders[i].get()) {
+            ambi_roomsim_setSourceY(hAmbi, i, (float)ySliders[i]->getValue());
+            break;
+        }
+        if (sliderThatWasMoved == zSliders[i].get()) {
+            ambi_roomsim_setSourceZ(hAmbi, i, (float)zSliders[i]->getValue());
+            break;
+        }
     }
 
     //[/UsersliderValueChanged_Pre]
@@ -211,10 +236,12 @@ void inputCoordsView::sliderValueChanged (juce::Slider* sliderThatWasMoved)
 void inputCoordsView::refreshCoords(){
     /* update slider values and limits */
     for( int i=0; i<maxNCH; i++){
-        aziSliders[i]->setRange (-360.0, 360.0, 0.001);
-        aziSliders[i]->setValue(ambi_roomsim_getSourceAzi_deg(hAmbi, i), dontSendNotification);
-        elevSliders[i]->setRange (-180.0, 180.0, 0.001);
-        elevSliders[i]->setValue(ambi_roomsim_getSourceElev_deg(hAmbi, i), dontSendNotification);
+        xSliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimX(hAmbi), 0.001);
+        xSliders[i]->setValue(ambi_roomsim_getSourceX(hAmbi, i), dontSendNotification);
+        ySliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimY(hAmbi), 0.001);
+        ySliders[i]->setValue(ambi_roomsim_getSourceY(hAmbi, i), dontSendNotification);
+        zSliders[i]->setRange (0.0f, ambi_roomsim_getRoomDimZ(hAmbi), 0.001);
+        zSliders[i]->setValue(ambi_roomsim_getSourceZ(hAmbi, i), dontSendNotification);
     }
 }
 
